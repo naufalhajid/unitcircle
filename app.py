@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import math
 import plotly.graph_objects as go
 
 st.set_page_config(page_title="Unit Circle Interaktif", layout="wide")
@@ -7,8 +8,11 @@ st.set_page_config(page_title="Unit Circle Interaktif", layout="wide")
 st.title("🧭 Unit Circle Interaktif")
 st.write("""
 Klik titik pada *Unit Circle* atau gunakan slider di bawah untuk memilih sudut tertentu.
-Aplikasi ini menampilkan *kuadran, sudut relasi terhadap sumbu-x, serta nilai sin, cos, dan tan*.
+Aplikasi ini menampilkan visualisasi geometris dan nilai dari keenam fungsi trigonometri.
 """)
+
+# --- Konstanta ---
+TOLERANCE = 1e-9 # Toleransi untuk perbandingan floating point (menghindari pembagian dengan nol)
 
 # --- Fungsi bantu ---
 def get_quadrant(angle):
@@ -39,6 +43,8 @@ def reference_angle(angle):
 # --- Inisialisasi Session State --- 
 if 'angle_deg' not in st.session_state:
     st.session_state.angle_deg = 30
+if 'rad_mode' not in st.session_state:
+    st.session_state.rad_mode = False
 
 # --- Callback untuk sinkronisasi widget --- 
 def update_angle():
@@ -108,6 +114,11 @@ with col2:
         value=st.session_state.angle_deg, step=1,
         key='angle_num_input', on_change=update_angle
     )
+
+    # Toggle untuk mode Radian
+    st.toggle('Mode Radian', key='rad_mode', help="Tampilkan sudut dan nilai dalam radian.")
+
+    st.markdown("---")
     
     # Slider untuk memilih sudut.
     st.slider(
@@ -128,41 +139,71 @@ fig.add_trace(go.Scatter(x=[0, x_point], y=[0, y_point], mode="lines", line=dict
 fig.add_trace(go.Scatter(x=[x_point, x_point], y=[0, y_point], mode="lines", line=dict(color="red", width=3, dash='dash'), name="Sin", uid="sin_line"))
 # Garis Cosinus (biru) - Garis horizontal dari pusat di sepanjang sumbu-x
 fig.add_trace(go.Scatter(x=[0, x_point], y=[0, 0], mode="lines", line=dict(color="blue", width=3, dash='dash'), name="Cos", uid="cos_line"))
-# Garis Tangen (hijau) - Garis singgung vertikal di (1,0)
-if abs(x_point) > 1e-9:
+
+# Visualisasi untuk Tan dan Sec
+if abs(x_point) > TOLERANCE:
     tan_val_selected = y_point / x_point
     tan_display_limit = 1.5
     tan_val_display = np.clip(tan_val_selected, -tan_display_limit, tan_display_limit)
     
+    # Garis Tangen (hijau)
     fig.add_trace(go.Scatter(x=[1, 1], y=[0, tan_val_display], mode="lines", line=dict(color="green", width=3, dash='dash'), name="Tan", uid="tan_line"))
-    fig.add_trace(go.Scatter(x=[0, 1.2], y=[0, 1.2 * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot'), uid="tan_helper"))
+    # Garis Secant (ungu) - dari origin ke ujung garis tangen, membentuk hipotenusa
+    fig.add_trace(go.Scatter(x=[0, 1], y=[0, tan_val_selected], mode="lines", line=dict(color="purple", width=2, dash='dot'), name="Sec", uid="sec_line"))
+
+# Visualisasi untuk Cot dan Csc
+if abs(y_point) > TOLERANCE:
+    cot_val_selected = x_point / y_point
+    cot_display_limit = 1.5
+    cot_val_display = np.clip(cot_val_selected, -cot_display_limit, cot_display_limit)
+
+    # Garis Cotangen (oranye) - garis singgung horizontal di (0,1)
+    fig.add_trace(go.Scatter(x=[0, cot_val_display], y=[1, 1], mode="lines", line=dict(color="orange", width=3, dash='dash'), name="Cot", uid="cot_line"))
+    # Garis Cosecan (pink) - dari origin ke ujung garis cotangen, membentuk hipotenusa
+    fig.add_trace(go.Scatter(x=[0, cot_val_selected], y=[0, 1], mode="lines", line=dict(color="pink", width=2, dash='dot'), name="Csc", uid="csc_line"))
 
 with col1:
     # --- Tampilkan Grafik Interaktif (HANYA SEKALI) --- 
     click_data = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="unit_circle")
 
-# --- Hitung nilai trigonometri ---
+# --- Hitung semua nilai trigonometri ---
 angle_rad = np.deg2rad(angle_deg_current)
 quadrant = get_quadrant(angle_deg_current % 360)
 ref_angle = reference_angle(angle_deg_current)
 sin_val = np.sin(angle_rad)
 cos_val = np.cos(angle_rad)
-tan_val = np.tan(angle_rad) if cos_val != 0 else "Tidak terdefinisi"
+
+tan_val = sin_val / cos_val if abs(cos_val) > TOLERANCE else "∞"
+sec_val = 1 / cos_val if abs(cos_val) > TOLERANCE else "∞"
+csc_val = 1 / sin_val if abs(sin_val) > TOLERANCE else "∞"
+cot_val = cos_val / sin_val if abs(sin_val) > TOLERANCE else "∞"
 
 with col2:
     # --- Info Sudut ---
     st.subheader("📘 Informasi Sudut")
-    st.markdown(f"**Sudut (θ):** `{angle_deg_current}°` atau `{angle_rad:.3f}` radian")
+    if st.session_state.rad_mode:
+        st.markdown(f"**Sudut (θ):** `{angle_rad:.3f}` radian")
+    else:
+        st.markdown(f"**Sudut (θ):** `{angle_deg_current}°`")
+
     st.markdown(f"**Koordinat (x, y):** `({cos_val:.3f}, {sin_val:.3f})`")
     st.markdown(f"**Kuadran:** {quadrant}")
-    st.markdown(f"**Sudut Relasi:** {ref_angle}°")
+    if not st.session_state.rad_mode:
+        st.markdown(f"**Sudut Relasi:** {ref_angle}°")
 
     st.subheader("🔢 Nilai Fungsi")
-    m1, m2, m3 = st.columns(3)
-    m1.metric(label="cos(θ)", value=f"{cos_val:.3f}")
-    m2.metric(label="sin(θ)", value=f"{sin_val:.3f}")
-    m3.metric(label="tan(θ)", value=f"{tan_val if isinstance(tan_val, str) else f'{tan_val:.3f}'}")
+    m1, m2 = st.columns(2)
+    m3, m4 = st.columns(2)
+    m5, m6 = st.columns(2)
+    
+    m1.metric(label="sin(θ)", value=f"{sin_val:.3f}" if isinstance(sin_val, float) else sin_val)
+    m2.metric(label="cos(θ)", value=f"{cos_val:.3f}" if isinstance(cos_val, float) else cos_val)
+    m3.metric(label="tan(θ)", value=f"{tan_val:.3f}" if isinstance(tan_val, float) else tan_val)
+    m4.metric(label="cot(θ)", value=f"{cot_val:.3f}" if isinstance(cot_val, float) else cot_val)
+    m5.metric(label="csc(θ)", value=f"{csc_val:.3f}" if isinstance(csc_val, float) else csc_val)
+    m6.metric(label="sec(θ)", value=f"{sec_val:.3f}" if isinstance(sec_val, float) else sec_val)
 
+    st.markdown("<br>", unsafe_allow_html=True) # Spacer
     st.subheader("💡 Identitas Pythagoras")
     pythagorean_eq = f"`sin²θ + cos²θ = ({sin_val:.3f})² + ({cos_val:.3f})²`"
     pythagorean_res = f"`= {sin_val**2:.3f} + {cos_val**2:.3f} = {sin_val**2 + cos_val**2:.1f}`"
