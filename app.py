@@ -37,6 +37,11 @@ def reference_angle(angle):
     else:
         return 360 - angle_mod
 
+# --- Inisialisasi Session State ---
+# Ini penting untuk menyimpan sudut yang dipilih antar-rerun aplikasi
+if 'angle_deg' not in st.session_state:
+    st.session_state.angle_deg = 30
+
 # --- Titik sudut utama ---
 angles_deg = list(range(0, 360, 30))
 angles_rad = [np.deg2rad(a) for a in angles_deg]
@@ -84,67 +89,60 @@ fig.update_layout(
     showlegend=False
 )
 
-# --- Ambil sudut yang dipilih (dari klik atau slider) ---
-selected_angle_deg = angle_deg_from_click = None
-
-# --- Tangkap klik pengguna ---
-click_data = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="unit_circle")
-
-# --- Slider fallback ---
-slider_angle_deg = st.slider("Atau pilih sudut dengan slider:", 0, 360, 30, step=1)
-
-# --- Tentukan sudut yang akan digunakan ---
-if click_data and click_data["selection"]["points"]:
-    point_idx = click_data["selection"]["points"][0]["point_index"]
-    angle_deg_from_click = angles_deg[point_idx]
-    angle_deg = angle_deg_from_click
-else:
-    angle_deg = slider_angle_deg
+# --- Interaksi Pengguna ---
+# Slider untuk memilih sudut. Nilainya akan memperbarui session state.
+slider_angle = st.slider(
+    "Atau pilih sudut dengan slider:", 0, 360, st.session_state.angle_deg, step=1, key="angle_slider"
+)
+st.session_state.angle_deg = slider_angle
 
 # --- Tambahkan visualisasi garis trigonometri ke grafik ---
-angle_rad_selected = np.deg2rad(angle_deg)
+angle_rad_selected = np.deg2rad(st.session_state.angle_deg)
 x_point = np.cos(angle_rad_selected)
 y_point = np.sin(angle_rad_selected)
-tan_val_selected = np.tan(angle_rad_selected)
 
-# Batasi panjang tangen agar visualisasi tetap baik
-tan_display_limit = 1.5
-if abs(tan_val_selected) > tan_display_limit:
-    tan_val_display = np.sign(tan_val_selected) * tan_display_limit
-else:
-    tan_val_display = tan_val_selected
-
-# Garis Radius (Terminal)
+# Tambahkan garis-garis dinamis ke objek 'fig' SEBELUM menampilkannya
+# Garis Radius (Terminal) - Garis dari pusat ke titik di lingkaran
 fig.add_trace(go.Scatter(x=[0, x_point], y=[0, y_point], mode="lines", line=dict(color="black", width=2), name="Radius"))
-# Garis Sinus (merah)
+# Garis Sinus (merah) - Garis vertikal dari titik ke sumbu-x
 fig.add_trace(go.Scatter(x=[x_point, x_point], y=[0, y_point], mode="lines", line=dict(color="red", width=3, dash='dash'), name="Sin"))
-# Garis Cosinus (biru)
+# Garis Cosinus (biru) - Garis horizontal dari pusat di sepanjang sumbu-x
 fig.add_trace(go.Scatter(x=[0, x_point], y=[0, 0], mode="lines", line=dict(color="blue", width=3, dash='dash'), name="Cos"))
-# Garis Tangen (hijau) - hanya jika cos != 0
+# Garis Tangen (hijau) - Garis singgung vertikal di (1,0)
 if abs(x_point) > 1e-9:
+    tan_val_selected = y_point / x_point
+    # Batasi panjang visual garis tangen agar tidak terlalu ekstrem
+    tan_display_limit = 1.5
+    tan_val_display = np.clip(tan_val_selected, -tan_display_limit, tan_display_limit)
+    
     fig.add_trace(go.Scatter(x=[1, 1], y=[0, tan_val_display], mode="lines", line=dict(color="green", width=3, dash='dash'), name="Tan"))
-    # Garis bantu untuk tangen
-    fig.add_trace(go.Scatter(x=[0, 1.2 if x_point > 0 else -1.2], y=[0, (1.2 if x_point > 0 else -1.2) * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot')))
+    # Garis bantu yang menunjukkan perpotongan dengan garis tangen
+    fig.add_trace(go.Scatter(x=[0, 1.2], y=[0, 1.2 * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot')))
 
-# Tampilkan kembali grafik yang sudah diperbarui
-st.plotly_chart(fig, use_container_width=True, key="unit_circle_updated")
+# --- Tampilkan Grafik Interaktif (HANYA SEKALI) ---
+click_data = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="unit_circle")
 
-# --- Jika ada klik dari grafik ---
+# --- Logika setelah klik ---
+# Jika ada data klik, perbarui session state dan rerun untuk menggambar ulang
 if click_data and click_data["selection"]["points"]:
     point_idx = click_data["selection"]["points"][0]["point_index"]
-    angle_deg = angles_deg[point_idx]
+    clicked_angle = angles_deg[point_idx]
+    # Hanya rerun jika sudut yang diklik berbeda untuk menghindari loop tak terbatas
+    if st.session_state.angle_deg != clicked_angle:
+        st.session_state.angle_deg = clicked_angle
+        st.rerun()
 
 # --- Hitung nilai trigonometri ---
-angle_rad = np.deg2rad(angle_deg)
-quadrant = get_quadrant(angle_deg % 360)
-ref_angle = reference_angle(angle_deg)
+angle_rad = np.deg2rad(st.session_state.angle_deg)
+quadrant = get_quadrant(st.session_state.angle_deg % 360)
+ref_angle = reference_angle(st.session_state.angle_deg)
 sin_val = np.sin(angle_rad)
 cos_val = np.cos(angle_rad)
 tan_val = np.tan(angle_rad) if cos_val != 0 else "Tidak terdefinisi"
 
 # --- Info Sudut ---
 st.subheader("📘 Informasi Sudut")
-st.write(f"*Sudut yang dipilih:* {angle_deg}°")
+st.write(f"*Sudut yang dipilih:* **{st.session_state.angle_deg}°**")
 st.write(f"*Kuadran:* {quadrant}")
 st.write(f"*Sudut relasi terhadap sumbu x:* {ref_angle}°")
 st.write(f"*sin(θ) =* {sin_val:.3f}")
