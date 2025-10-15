@@ -43,7 +43,11 @@ if 'angle_deg' not in st.session_state:
     st.session_state.angle_deg = 30
 
 # --- Titik sudut utama ---
-angles_deg = list(range(0, 360, 30))
+# Gabungkan kelipatan 30 dan 45 derajat, lalu urutkan dan hapus duplikat
+angles_deg_30 = list(range(0, 360, 30))
+angles_deg_45 = list(range(0, 360, 45))
+angles_deg = sorted(list(set(angles_deg_30 + angles_deg_45)))
+
 angles_rad = [np.deg2rad(a) for a in angles_deg]
 points_x = [np.cos(a) for a in angles_rad]
 points_y = [np.sin(a) for a in angles_rad]
@@ -89,15 +93,27 @@ fig.update_layout(
     showlegend=False
 )
 
-# --- Interaksi Pengguna ---
-# Slider untuk memilih sudut. Nilainya akan memperbarui session state.
-slider_angle = st.slider(
-    "Atau pilih sudut dengan slider:", 0, 360, st.session_state.angle_deg, step=1, key="angle_slider"
-)
-st.session_state.angle_deg = slider_angle
+# --- Layout Aplikasi (2 kolom) ---
+col1, col2 = st.columns([0.6, 0.4])
 
-# --- Tambahkan visualisasi garis trigonometri ke grafik ---
-angle_rad_selected = np.deg2rad(st.session_state.angle_deg)
+with col2:
+    st.subheader("⚙️ Kontrol Sudut")
+    # Input Angka
+    num_angle = st.number_input(
+        "Masukkan sudut (derajat):", min_value=0, max_value=360, value=st.session_state.angle_deg, step=1
+    )
+    
+    # Slider untuk memilih sudut.
+    slider_angle = st.slider(
+        "Atau pilih dengan slider:", 0, 360, num_angle, step=1, key="angle_slider"
+    )
+    
+    # Sinkronkan state dari input
+    st.session_state.angle_deg = slider_angle
+
+# --- Perhitungan dinamis berdasarkan state ---
+angle_deg_current = st.session_state.angle_deg
+angle_rad_selected = np.deg2rad(angle_deg_current)
 x_point = np.cos(angle_rad_selected)
 y_point = np.sin(angle_rad_selected)
 
@@ -119,8 +135,9 @@ if abs(x_point) > 1e-9:
     # Garis bantu yang menunjukkan perpotongan dengan garis tangen
     fig.add_trace(go.Scatter(x=[0, 1.2], y=[0, 1.2 * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot')))
 
-# --- Tampilkan Grafik Interaktif (HANYA SEKALI) ---
-click_data = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="unit_circle")
+with col1:
+    # --- Tampilkan Grafik Interaktif (HANYA SEKALI) ---
+    click_data = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="unit_circle")
 
 # --- Logika setelah klik ---
 # Jika ada data klik, perbarui session state dan rerun untuk menggambar ulang
@@ -128,26 +145,36 @@ if click_data and click_data["selection"]["points"]:
     point_idx = click_data["selection"]["points"][0]["point_index"]
     clicked_angle = angles_deg[point_idx]
     # Hanya rerun jika sudut yang diklik berbeda untuk menghindari loop tak terbatas
-    if st.session_state.angle_deg != clicked_angle:
+    if angle_deg_current != clicked_angle:
         st.session_state.angle_deg = clicked_angle
         st.rerun()
 
 # --- Hitung nilai trigonometri ---
-angle_rad = np.deg2rad(st.session_state.angle_deg)
-quadrant = get_quadrant(st.session_state.angle_deg % 360)
-ref_angle = reference_angle(st.session_state.angle_deg)
+angle_rad = np.deg2rad(angle_deg_current)
+quadrant = get_quadrant(angle_deg_current % 360)
+ref_angle = reference_angle(angle_deg_current)
 sin_val = np.sin(angle_rad)
 cos_val = np.cos(angle_rad)
 tan_val = np.tan(angle_rad) if cos_val != 0 else "Tidak terdefinisi"
 
-# --- Info Sudut ---
-st.subheader("📘 Informasi Sudut")
-st.write(f"*Sudut yang dipilih:* **{st.session_state.angle_deg}°**")
-st.write(f"*Kuadran:* {quadrant}")
-st.write(f"*Sudut relasi terhadap sumbu x:* {ref_angle}°")
-st.write(f"*sin(θ) =* {sin_val:.3f}")
-st.write(f"*cos(θ) =* {cos_val:.3f}")
-st.write(f"*tan(θ) =* {tan_val if isinstance(tan_val, str) else f'{tan_val:.3f}'}")
+with col2:
+    # --- Info Sudut ---
+    st.subheader("📘 Informasi Sudut")
+    st.markdown(f"**Sudut (θ):** `{angle_deg_current}°` atau `{angle_rad:.3f}` radian")
+    st.markdown(f"**Koordinat (x, y):** `({cos_val:.3f}, {sin_val:.3f})`")
+    st.markdown(f"**Kuadran:** {quadrant}")
+    st.markdown(f"**Sudut Relasi:** {ref_angle}°")
+
+    st.subheader("🔢 Nilai Trigonometri")
+    st.markdown(f"<span style='color:blue'>**cos(θ)** = {cos_val:.3f}</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:red'>**sin(θ)** = {sin_val:.3f}</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='color:green'>**tan(θ)** = {tan_val if isinstance(tan_val, str) else f'{tan_val:.3f}'}</span>", unsafe_allow_html=True)
+
+    st.subheader("💡 Identitas Pythagoras")
+    pythagorean_eq = f"`sin²θ + cos²θ = ({sin_val:.3f})² + ({cos_val:.3f})²`"
+    pythagorean_res = f"`= {sin_val**2:.3f} + {cos_val**2:.3f} = {sin_val**2 + cos_val**2:.3f}`"
+    st.markdown(pythagorean_eq)
+    st.markdown(pythagorean_res)
 
 st.markdown("---")
 st.caption("Dikembangkan untuk membantu siswa memahami konsep sudut dan relasinya pada Unit Circle 🌐")
