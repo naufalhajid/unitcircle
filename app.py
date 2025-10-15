@@ -1,4 +1,3 @@
-# app_unit_circle_clickable.py
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
@@ -37,19 +36,17 @@ def reference_angle(angle):
     else:
         return 360 - angle_mod
 
-# --- Inisialisasi Session State ---
-# Ini penting untuk menyimpan sudut yang dipilih antar-rerun aplikasi
+# --- Inisialisasi Session State --- 
 if 'angle_deg' not in st.session_state:
     st.session_state.angle_deg = 30
 
-# --- Callback untuk sinkronisasi widget ---
+# --- Callback untuk sinkronisasi widget --- 
 def update_angle():
-    # Perbarui state dari widget yang terakhir diubah (slider atau num_input)
+    # Perbarui session state dengan nilai terbaru dari slider atau input angka
     st.session_state.angle_deg = st.session_state.get('angle_slider', st.session_state.angle_deg)
     st.session_state.angle_deg = st.session_state.get('angle_num_input', st.session_state.angle_deg)
 
 # --- Titik sudut utama ---
-# Gabungkan kelipatan 30 dan 45 derajat, lalu urutkan dan hapus duplikat
 angles_deg_30 = list(range(0, 360, 30))
 angles_deg_45 = list(range(0, 360, 45))
 angles_deg = sorted(list(set(angles_deg_30 + angles_deg_45)))
@@ -66,10 +63,10 @@ circle_y = np.sin(theta)
 fig = go.Figure()
 
 # Tambahkan warna kuadran
-fig.add_shape(type="rect", x0=0, y0=0, x1=1.2, y1=1.2, fillcolor="rgba(227, 242, 253, 0.5)", line_width=0) # Biru muda
-fig.add_shape(type="rect", x0=-1.2, y0=0, x1=0, y1=1.2, fillcolor="rgba(232, 245, 233, 0.5)", line_width=0) # Hijau muda
-fig.add_shape(type="rect", x0=-1.2, y0=-1.2, x1=0, y1=0, fillcolor="rgba(255, 243, 224, 0.5)", line_width=0) # Oranye muda
-fig.add_shape(type="rect", x0=0, y0=-1.2, x1=1.2, y1=0, fillcolor="rgba(255, 235, 238, 0.5)", line_width=0) # Merah muda
+fig.add_shape(type="rect", x0=0, y0=0, x1=1.2, y1=1.2, fillcolor="rgba(227, 242, 253, 0.5)", line_width=0)  # Biru muda
+fig.add_shape(type="rect", x0=-1.2, y0=0, x1=0, y1=1.2, fillcolor="rgba(232, 245, 233, 0.5)", line_width=0)  # Hijau muda
+fig.add_shape(type="rect", x0=-1.2, y0=-1.2, x1=0, y1=0, fillcolor="rgba(255, 243, 224, 0.5)", line_width=0)  # Oranye muda
+fig.add_shape(type="rect", x0=0, y0=-1.2, x1=1.2, y1=0, fillcolor="rgba(255, 235, 238, 0.5)", line_width=0)  # Merah muda
 
 # Lingkaran utama
 fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode="lines", line=dict(color="black"), showlegend=False))
@@ -97,7 +94,7 @@ fig.update_layout(
     yaxis=dict(range=[-1.3, 1.3], visible=False),
     clickmode='event+select',
     showlegend=False,
-    transition={'duration': 300, 'easing': 'linear-in-out'} # Menambahkan animasi transisi
+    transition={'duration': 300, 'easing': 'linear-in-out'}  # Menambahkan animasi transisi
 )
 
 # --- Layout Aplikasi (2 kolom) ---
@@ -134,27 +131,15 @@ fig.add_trace(go.Scatter(x=[0, x_point], y=[0, 0], mode="lines", line=dict(color
 # Garis Tangen (hijau) - Garis singgung vertikal di (1,0)
 if abs(x_point) > 1e-9:
     tan_val_selected = y_point / x_point
-    # Batasi panjang visual garis tangen agar tidak terlalu ekstrem
     tan_display_limit = 1.5
     tan_val_display = np.clip(tan_val_selected, -tan_display_limit, tan_display_limit)
     
     fig.add_trace(go.Scatter(x=[1, 1], y=[0, tan_val_display], mode="lines", line=dict(color="green", width=3, dash='dash'), name="Tan", uid="tan_line"))
-    # Garis bantu yang menunjukkan perpotongan dengan garis tangen
     fig.add_trace(go.Scatter(x=[0, 1.2], y=[0, 1.2 * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot'), uid="tan_helper"))
 
 with col1:
-    # --- Tampilkan Grafik Interaktif (HANYA SEKALI) ---
+    # --- Tampilkan Grafik Interaktif (HANYA SEKALI) --- 
     click_data = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="unit_circle")
-
-# --- Logika setelah klik ---
-# Jika ada data klik, perbarui session state dan rerun untuk menggambar ulang
-if click_data and click_data["selection"]["points"]:
-    point_idx = click_data["selection"]["points"][0]["point_index"]
-    clicked_angle = angles_deg[point_idx]
-    # Hanya rerun jika sudut yang diklik berbeda untuk menghindari loop tak terbatas
-    if angle_deg_current != clicked_angle:
-        st.session_state.angle_deg = clicked_angle
-        st.rerun()
 
 # --- Hitung nilai trigonometri ---
 angle_rad = np.deg2rad(angle_deg_current)
