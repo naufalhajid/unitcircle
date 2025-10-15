@@ -3,7 +3,7 @@ import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Unit Circle Interaktif", layout="centered")
+st.set_page_config(page_title="Unit Circle Interaktif", layout="wide")
 
 st.title("🧭 Unit Circle Interaktif")
 st.write("""
@@ -42,6 +42,12 @@ def reference_angle(angle):
 if 'angle_deg' not in st.session_state:
     st.session_state.angle_deg = 30
 
+# --- Callback untuk sinkronisasi widget ---
+def update_angle():
+    # Perbarui state dari widget yang terakhir diubah (slider atau num_input)
+    st.session_state.angle_deg = st.session_state.get('angle_slider', st.session_state.angle_deg)
+    st.session_state.angle_deg = st.session_state.get('angle_num_input', st.session_state.angle_deg)
+
 # --- Titik sudut utama ---
 # Gabungkan kelipatan 30 dan 45 derajat, lalu urutkan dan hapus duplikat
 angles_deg_30 = list(range(0, 360, 30))
@@ -60,10 +66,10 @@ circle_y = np.sin(theta)
 fig = go.Figure()
 
 # Tambahkan warna kuadran
-fig.add_shape(type="rect", x0=0, y0=0, x1=1.2, y1=1.2, fillcolor="rgba(0,255,0,0.1)", line_width=0)
-fig.add_shape(type="rect", x0=-1.2, y0=0, x1=0, y1=1.2, fillcolor="rgba(0,0,255,0.1)", line_width=0)
-fig.add_shape(type="rect", x0=-1.2, y0=-1.2, x1=0, y1=0, fillcolor="rgba(255,0,0,0.1)", line_width=0)
-fig.add_shape(type="rect", x0=0, y0=-1.2, x1=1.2, y1=0, fillcolor="rgba(255,255,0,0.1)", line_width=0)
+fig.add_shape(type="rect", x0=0, y0=0, x1=1.2, y1=1.2, fillcolor="rgba(227, 242, 253, 0.5)", line_width=0) # Biru muda
+fig.add_shape(type="rect", x0=-1.2, y0=0, x1=0, y1=1.2, fillcolor="rgba(232, 245, 233, 0.5)", line_width=0) # Hijau muda
+fig.add_shape(type="rect", x0=-1.2, y0=-1.2, x1=0, y1=0, fillcolor="rgba(255, 243, 224, 0.5)", line_width=0) # Oranye muda
+fig.add_shape(type="rect", x0=0, y0=-1.2, x1=1.2, y1=0, fillcolor="rgba(255, 235, 238, 0.5)", line_width=0) # Merah muda
 
 # Lingkaran utama
 fig.add_trace(go.Scatter(x=circle_x, y=circle_y, mode="lines", line=dict(color="black"), showlegend=False))
@@ -76,7 +82,7 @@ fig.add_trace(go.Scatter(
     text=[f"{a}°" for a in angles_deg],
     textposition="top center",
     marker=dict(size=10, color="black"),
-    hovertemplate="Sudut: %{text}<extra></extra>",
+    hovertemplate="<b>%{text}</b><br>(%{x:.2f}, %{y:.2f})<extra></extra>",
     name="Sudut",
 ))
 
@@ -86,30 +92,31 @@ fig.add_shape(type="line", x0=0, x1=0, y0=-1.2, y1=1.2, line=dict(color="gray", 
 
 fig.update_layout(
     width=600, height=600,
-    margin=dict(l=20, r=20, t=20, b=20),
+    margin=dict(l=10, r=10, t=10, b=10),
     xaxis=dict(range=[-1.3, 1.3], visible=False),
     yaxis=dict(range=[-1.3, 1.3], visible=False),
     clickmode='event+select',
-    showlegend=False
+    showlegend=False,
+    transition={'duration': 300, 'easing': 'linear-in-out'} # Menambahkan animasi transisi
 )
 
 # --- Layout Aplikasi (2 kolom) ---
-col1, col2 = st.columns([0.6, 0.4])
+col1, col2 = st.columns([0.65, 0.35])
 
 with col2:
     st.subheader("⚙️ Kontrol Sudut")
     # Input Angka
-    num_angle = st.number_input(
-        "Masukkan sudut (derajat):", min_value=0, max_value=360, value=st.session_state.angle_deg, step=1
+    st.number_input(
+        "Masukkan sudut (derajat):", min_value=0, max_value=360,
+        value=st.session_state.angle_deg, step=1,
+        key='angle_num_input', on_change=update_angle
     )
     
     # Slider untuk memilih sudut.
-    slider_angle = st.slider(
-        "Atau pilih dengan slider:", 0, 360, num_angle, step=1, key="angle_slider"
+    st.slider(
+        "Atau pilih dengan slider:", 0, 360,
+        value=st.session_state.angle_deg, step=1, key="angle_slider", on_change=update_angle
     )
-    
-    # Sinkronkan state dari input
-    st.session_state.angle_deg = slider_angle
 
 # --- Perhitungan dinamis berdasarkan state ---
 angle_deg_current = st.session_state.angle_deg
@@ -119,11 +126,11 @@ y_point = np.sin(angle_rad_selected)
 
 # Tambahkan garis-garis dinamis ke objek 'fig' SEBELUM menampilkannya
 # Garis Radius (Terminal) - Garis dari pusat ke titik di lingkaran
-fig.add_trace(go.Scatter(x=[0, x_point], y=[0, y_point], mode="lines", line=dict(color="black", width=2), name="Radius"))
+fig.add_trace(go.Scatter(x=[0, x_point], y=[0, y_point], mode="lines", line=dict(color="black", width=2), name="Radius", uid="radius"))
 # Garis Sinus (merah) - Garis vertikal dari titik ke sumbu-x
-fig.add_trace(go.Scatter(x=[x_point, x_point], y=[0, y_point], mode="lines", line=dict(color="red", width=3, dash='dash'), name="Sin"))
+fig.add_trace(go.Scatter(x=[x_point, x_point], y=[0, y_point], mode="lines", line=dict(color="red", width=3, dash='dash'), name="Sin", uid="sin_line"))
 # Garis Cosinus (biru) - Garis horizontal dari pusat di sepanjang sumbu-x
-fig.add_trace(go.Scatter(x=[0, x_point], y=[0, 0], mode="lines", line=dict(color="blue", width=3, dash='dash'), name="Cos"))
+fig.add_trace(go.Scatter(x=[0, x_point], y=[0, 0], mode="lines", line=dict(color="blue", width=3, dash='dash'), name="Cos", uid="cos_line"))
 # Garis Tangen (hijau) - Garis singgung vertikal di (1,0)
 if abs(x_point) > 1e-9:
     tan_val_selected = y_point / x_point
@@ -131,9 +138,9 @@ if abs(x_point) > 1e-9:
     tan_display_limit = 1.5
     tan_val_display = np.clip(tan_val_selected, -tan_display_limit, tan_display_limit)
     
-    fig.add_trace(go.Scatter(x=[1, 1], y=[0, tan_val_display], mode="lines", line=dict(color="green", width=3, dash='dash'), name="Tan"))
+    fig.add_trace(go.Scatter(x=[1, 1], y=[0, tan_val_display], mode="lines", line=dict(color="green", width=3, dash='dash'), name="Tan", uid="tan_line"))
     # Garis bantu yang menunjukkan perpotongan dengan garis tangen
-    fig.add_trace(go.Scatter(x=[0, 1.2], y=[0, 1.2 * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot')))
+    fig.add_trace(go.Scatter(x=[0, 1.2], y=[0, 1.2 * tan_val_selected], mode="lines", line=dict(color="gray", width=1, dash='dot'), uid="tan_helper"))
 
 with col1:
     # --- Tampilkan Grafik Interaktif (HANYA SEKALI) ---
@@ -165,14 +172,15 @@ with col2:
     st.markdown(f"**Kuadran:** {quadrant}")
     st.markdown(f"**Sudut Relasi:** {ref_angle}°")
 
-    st.subheader("🔢 Nilai Trigonometri")
-    st.markdown(f"<span style='color:blue'>**cos(θ)** = {cos_val:.3f}</span>", unsafe_allow_html=True)
-    st.markdown(f"<span style='color:red'>**sin(θ)** = {sin_val:.3f}</span>", unsafe_allow_html=True)
-    st.markdown(f"<span style='color:green'>**tan(θ)** = {tan_val if isinstance(tan_val, str) else f'{tan_val:.3f}'}</span>", unsafe_allow_html=True)
+    st.subheader("🔢 Nilai Fungsi")
+    m1, m2, m3 = st.columns(3)
+    m1.metric(label="cos(θ)", value=f"{cos_val:.3f}")
+    m2.metric(label="sin(θ)", value=f"{sin_val:.3f}")
+    m3.metric(label="tan(θ)", value=f"{tan_val if isinstance(tan_val, str) else f'{tan_val:.3f}'}")
 
     st.subheader("💡 Identitas Pythagoras")
     pythagorean_eq = f"`sin²θ + cos²θ = ({sin_val:.3f})² + ({cos_val:.3f})²`"
-    pythagorean_res = f"`= {sin_val**2:.3f} + {cos_val**2:.3f} = {sin_val**2 + cos_val**2:.3f}`"
+    pythagorean_res = f"`= {sin_val**2:.3f} + {cos_val**2:.3f} = {sin_val**2 + cos_val**2:.1f}`"
     st.markdown(pythagorean_eq)
     st.markdown(pythagorean_res)
 
